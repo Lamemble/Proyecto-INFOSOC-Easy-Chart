@@ -1,12 +1,25 @@
-import { useState } from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { AuthProvider } from "./auth/AuthProvider.jsx";
+import { AppShell } from "./layouts/AppShell.jsx";
+import { HomePage } from "./pages/HomePage.jsx";
+import { LoginPage } from "./pages/LoginPage.jsx";
+import { ProtectedRoute } from "./routes/ProtectedRoute.jsx";
 
 function App() {
-  const [count, setCount] = useState(0);
-
   return (
-    <button className="counter" onClick={() => setCount((count) => count + 1)}>
-      Count is {count}
-    </button>
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<AppShell />}>
+              <Route index element={<HomePage />} />
+            </Route>
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 
