@@ -4,6 +4,7 @@ import { AppShell } from "./layouts/AppShell.jsx";
 import { HomePage } from "./pages/HomePage.jsx";
 import { LoginPage } from "./pages/LoginPage.jsx";
 import { ProtectedRoute } from "./routes/ProtectedRoute.jsx";
+import { SearchPage } from "./pages/SearchPage.jsx";
 
 function App() {
   return (
@@ -13,7 +14,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<AppShell />}>
-              <Route index element={<HomePage />} />
+              <Route index element={<SearchPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
