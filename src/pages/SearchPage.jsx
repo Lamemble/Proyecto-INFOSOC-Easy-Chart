@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from '../utils/supabase';
 import { buscarDuenniosyMascotas } from "../services/search";
 
@@ -10,10 +10,19 @@ export function SearchPage() {
   const [error, setError] = useState("");
 
   const [mostrarForm, setMostrarForm] = useState(false);
+  const [pacienteSeleccionado, setPacienteSeleccionado] = useState(null);
+  const [historialVisitas, setHistorialVisitas] = useState([]);
+
+  const [mostrarFormVisita, setMostrarFormVisita] = useState(false);
+  const [motivoVisita, setMotivoVisita] = useState('');
+  const [observacionesVisita, setObservacionesVisita] = useState('');
+
+  const [nombreDueno, setNombreDueno] = useState('');
+  const [telefonoDueno, setTelefonoDueno] = useState('');
+
   const [nombreMascota, setNombreMascota] = useState("");
   const [especie, setEspecie] = useState("");
   const [raza, setRaza] = useState("");
-  const [ownerId, setOwnerId] = useState("");
 
   async function handleSearch() {
     setLoading(true);
@@ -32,90 +41,249 @@ export function SearchPage() {
 
   const manejarGuardado = async (e) => {
     e.preventDefault();
+    const { data: ownerData, error: ownerError } = await supabase
+      .from("owners")
+      .insert([
+        {
+          name: nombreDueno,
+          phone: telefonoDueno
+        }
+      ]).select();
+    if (ownerError) {
+      alert("Error al guardar dueño: " + ownerError.message);
+      return;
+    }
+    const nuevoDueñoId = ownerData[0].id;
+
+    const manejarGuardadoVisita = async (e) => {
+    e.preventDefault();
+
+    const { error } = await supabase
+      .from('visits')
+      .insert([
+        { 
+          pet_id: pacienteSeleccionado.id, // Vinculamos la visita a la mascota
+          visit_date: new Date().toISOString().split('T')[0], // Guarda la fecha de hoy (YYYY-MM-DD)
+          reason: motivoVisita, // Puede ser "Consulta", "Peluquería", "Vacuna"
+          observations: observacionesVisita 
+        }
+      ]);
+
+    if (error) {
+      alert("Error al guardar la visita: " + error.message);
+    } else {
+      alert("¡Visita registrada con éxito!");
+      setMotivoVisita('');
+      setObservacionesVisita('');
+      setMostrarFormVisita(false);
+      
+      cargarHistorial(pacienteSeleccionado.id);
+    }
+  };
+
     const { data, error } = await supabase
       .from("pets")
       .insert([{
         name: nombreMascota,
         species: especie,
         breed: raza,
-        owner_id: ownerId,
+        owner_id: nuevoDueñoId,
       }]);
     if (error) {
       alert("Hubo un error al guardar: " + error.message);
       console.error(error);
     } else {
       alert("'Ficha creada exitosamente");
+    
+      setNombreDueno("");
+      setTelefonoDueno("");
       setNombreMascota("");
       setEspecie("");
       setRaza("");
-      setOwnerId("");
       setMostrarForm(false);
     }
+
+    const cargarHistorial = async (idMascota) => {
+    const { data, error } = await supabase
+      .from('visits')
+      .select('*')
+      .eq('pet_id', idMascota)
+      .order('visit_date', { ascending: false }); // Ordena de más reciente a más antiguo
+
+    if (error) {
+      console.error("Error cargando historial:", error);
+    } else {
+      setHistorialVisitas(data);
+    }
+    useEffect(() => {
+      if (pacienteSeleccionado) {
+        cargarHistorial(pacienteSeleccionado.id);
+      } else {
+        setHistorialVisitas([]);
+      }
+    }, [pacienteSeleccionado]);
+  };
+
   };
   return (
-    <>
-      <h1>Busqueda</h1>
-      <button onClick={() => setMostrarForm(!mostrarForm)}>
-        {mostrarForm ? 'Cancelar Ficha' : 'Nueva Ficha'}
+    <div>
+      <h1>Sistema Veterinaria</h1>
+      {pacienteSeleccionado ? (
+        <div>
+          <button onClick={() => setPacienteSeleccionado(null)}>
+            ← Volver al buscador
+          </button>
+          <h2>Ficha Medica de: {pacienteSeleccionado.name}</h2>
+          <p><strong>Especie:</strong> {pacienteSeleccionado.species}</p>
+          <p><strong>Raza:</strong> {pacienteSeleccionado.breed || 'No especificada'}</p>
+
+          <hr />
+          <button onClick={() => setMostrarFormVisita(!mostrarFormVisita)}>
+            {mostrarFormVisita ? 'Cancelar' : '+Registrar Nueva Visita'}
+          </button>
+
+          {mostrarFormVisita && (
+            <form onSubmit={manejarGuardadoVisita} style={{ marginTop: '20px', border: '1px solid gray', padding: '15px'}}>
+              <h3>Detalles de la Atención</h3>
+
+              <div style={{ marginBottom: '10px' }}>
+                <label>Motivo (Consulta, Vacuna, Peluquería):</label>
+                <input
+                  type="text"
+                  required
+                  value={motivoVisita}
+                  onChange={(e) => setMotivoVisita(e.target.value)}
+                />
+              </div>
+              <div style={{ marginBottom: '10px' }}>
+                <label>Observaciones:</label>
+                <textarea
+                  required
+                  value={observacionesVisita}
+                  onChange={(e) => setObservacionesVisita(e.target.value)}
+                />
+              </div>
+              <button type="submit">💾 Guardar Registro</button>
+            </form>
+          )}
+
+          <hr />
+          <h3>Historial de Visitas</h3>
+
+          {historialVisitas.length === 0 ? (
+            <p>Este paciente no tiene visitas previas.</p>
+          ) : (
+            <ul style={{ listStyleType: 'none', padding: 0 }}>
+              {historialVisitas.map((visita) => (
+                <li key={visita.id} style={{ marginBottom: '15px', padding: '10px', border: '1px solid #ddd', borderRadius: '5px' }}>
+                  <strong>Fecha:</strong> {visita.visit_date} <br />
+                  <strong>Motivo:</strong> {visita.reason} <br />
+                  <strong>Observaciones:</strong> {visita.observations}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+  ) : (
+    <div style={{ fontFamily: 'sans-serif', padding: '20px' }}>
+      <h1>Sistema Veterinaria</h1>
+      
+      <button 
+        onClick={() => setMostrarForm(!mostrarForm)}
+        style={{ padding: '15px 30px', fontSize: '18px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+      >
+        {mostrarForm ? 'Cancelar Registro' : '+ Ingresar Nuevo Paciente'}
       </button>
+
       <br />
 
       {mostrarForm && (
-        <form onSubmit={manejarGuardado} style={{ marginTop: '20px', marginBottom: '20px', border: '1px solid black', padding: '20px' }}>
-          <h3>Registrar Nuevo Paciente</h3>
+        <form onSubmit={manejarGuardado} style={{ marginTop: '20px', marginBottom: '30px', border: '2px solid #ccc', padding: '30px', borderRadius: '10px', backgroundColor: '#f9f9f9' }}>
           
-          <div style={{ marginBottom: '10px' }}>
-            <label>Nombre de la Mascota: </label>
+          <h2 style={{ borderBottom: '2px solid black', paddingBottom: '10px' }}>1. Datos del Cliente (Humano)</h2>
+          
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', fontSize: '18px', fontWeight: 'bold' }}>Nombre Completo:</label>
             <input 
-              type="text" 
-              required
-              value={nombreMascota} 
-              onChange={(e) => setNombreMascota(e.target.value)} 
+              type="text" required value={nombreDueno} onChange={(e) => setNombreDueno(e.target.value)} 
+              style={{ width: '100%', padding: '10px', fontSize: '18px' }}
             />
           </div>
 
-          <div style={{ marginBottom: '10px' }}>
-            <label>Especie (Ej. Perro, Gato): </label>
+          <div style={{ marginBottom: '30px' }}>
+            <label style={{ display: 'block', fontSize: '18px', fontWeight: 'bold' }}>Teléfono:</label>
             <input 
-              type="text" 
-              required
-              value={especie} 
-              onChange={(e) => setEspecie(e.target.value)} 
+              type="text" value={telefonoDueno} onChange={(e) => setTelefonoDueno(e.target.value)} 
+              style={{ width: '100%', padding: '10px', fontSize: '18px' }}
             />
           </div>
 
-          <div style={{ marginBottom: '10px' }}>
-            <label>Raza: </label>
-            <input 
-              type="text" 
-              value={raza} 
-              onChange={(e) => setRaza(e.target.value)} 
-            />
-          </div>
+          <h2 style={{ borderBottom: '2px solid black', paddingBottom: '10px' }}>2. Datos del Paciente (Mascota)</h2>
           
-          <div style={{ marginBottom: '10px' }}>
-            <label>ID del Dueño (UUID): </label>
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', fontSize: '18px', fontWeight: 'bold' }}>Nombre de la Mascota:</label>
             <input 
-              type="text" 
-              required
-              placeholder="Ej: 123e4567-e89b-12d3..."
-              value={ownerId} 
-              onChange={(e) => setOwnerId(e.target.value)} 
+              type="text" required value={nombreMascota} onChange={(e) => setNombreMascota(e.target.value)} 
+              style={{ width: '100%', padding: '10px', fontSize: '18px' }}
             />
           </div>
-          <button type="submit">Guardar Ficha en Base de Datos</button>
+
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', fontSize: '18px', fontWeight: 'bold' }}>Especie (Ej. Perro, Gato):</label>
+            <input 
+              type="text" required value={especie} onChange={(e) => setEspecie(e.target.value)} 
+              style={{ width: '100%', padding: '10px', fontSize: '18px' }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '30px' }}>
+            <label style={{ display: 'block', fontSize: '18px', fontWeight: 'bold' }}>Raza:</label>
+            <input 
+              type="text" value={raza} onChange={(e) => setRaza(e.target.value)} 
+              style={{ width: '100%', padding: '10px', fontSize: '18px' }}
+            />
+          </div>
+
+          <button 
+            type="submit" 
+            style={{ width: '100%', padding: '20px', fontSize: '22px', backgroundColor: '#008CBA', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+          >
+            💾 Guardar Ficha Completa
+          </button>
         </form>
       )}
+
+      <hr style={{ marginTop: '40px', marginBottom: '20px' }} />
+
+      {/* --- SECCIÓN ORIGINAL DE BÚSQUEDA --- */}
+      <h2>Buscador Rápido</h2>
       <input
         type="text"
-        placeholder="Buscar..."
+        placeholder="Buscar paciente..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
+        style={{ padding: '10px', fontSize: '18px', width: '60%', marginRight: '10px' }}
       />
-      <button onClick={handleSearch}>Buscar</button>
-      {loading && <p>Cargando...</p>}
-      {error && <p>{error}</p>}
-      {!loading && !error && results.length === 0 && <p>Sin resultados</p>}
-    </>
-  );
+      <button onClick={handleSearch} style={{ padding: '10px 20px', fontSize: '18px' }}>Buscar</button>
+      
+      {loading && <p style={{ fontSize: '18px' }}>Cargando...</p>}
+      {error && <p style={{ fontSize: '18px', color: 'red' }}>{error}</p>}
+      {!loading && !error && results.length === 0 && <p style={{ fontSize: '18px' }}>Sin resultados</p>}
+      
+      {results.length > 0 && (
+        <ul>
+          {results.map((mascota) => (
+            <li key={mascota.id}>
+              {mascota.name} ({mascota.species})
+              <button onClick={() => setPacienteSeleccionado(mascota)}>
+                Ver Ficha
+              </button>
+            </li>
+          ))}
+        </ul>
+        )}
+    </div>
+    )}
+  </div>
+  )
 }
