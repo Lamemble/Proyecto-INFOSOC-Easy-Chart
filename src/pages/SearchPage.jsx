@@ -12,10 +12,10 @@ export function SearchPage() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState(null);
   const [historialVisitas, setHistorialVisitas] = useState([]);
-
   const [mostrarFormVisita, setMostrarFormVisita] = useState(false);
   const [motivoVisita, setMotivoVisita] = useState('');
   const [observacionesVisita, setObservacionesVisita] = useState('');
+  const [modoEdicion, setModoEdicion] = useState(false);
 
   const [nombreDueno, setNombreDueno] = useState('');
   const [telefonoDueno, setTelefonoDueno] = useState('');
@@ -123,7 +123,50 @@ export function SearchPage() {
       }
     }, [pacienteSeleccionado]);
   };
+  }
+  const activarEdicion = () => {
+    setNombreMascota(pacienteSeleccionado.name);
+    setEspecie(pacienteSeleccionado.species);
+    setRaza(pacienteSeleccionado.breed || '');
+    setNombreDueno(pacienteSeleccionado.owners.name);
+    setTelefonoDueno(pacienteSeleccionado.owners.phone || '');
+    setModoEdicion(true);
+  };
+  const guardarEdicion = async (e) => {
+    e.preventDefault();
 
+    const { error: errorDueno } = await supabase
+      .from('owners')
+      .update({ name: nombreDueno, phone: telefonoDueno })
+      .eq('id', pacienteSeleccionado.owners.id);
+
+    if (errorDueno) {
+      alert("Error al actualizar dueño: " + errorDueno.message);
+      return;
+    }
+
+    const { error: errorMascota } = await supabase
+      .from('pets')
+      .update({ name: nombreMascota, species: especie, breed: raza })
+      .eq('id', pacienteSeleccionado.id);
+
+    if (errorMascota) {
+      alert("Error al actualizar mascota: " + errorMascota.message);
+    } else {
+      alert("¡Datos actualizados correctamente!");
+      setModoEdicion(false);
+      setPacienteSeleccionado({
+        ...pacienteSeleccionado,
+        name: nombreMascota,
+        species: especie,
+        breed: raza,
+        owners: {
+          ...pacienteSeleccionado.owners,
+          name: nombreDueno,
+          phone: telefonoDueno
+        }
+      });
+    }
   };
   return (
     <div>
@@ -133,10 +176,35 @@ export function SearchPage() {
           <button onClick={() => setPacienteSeleccionado(null)}>
             ← Volver al buscador
           </button>
-          <h2>Ficha Medica de: {pacienteSeleccionado.name}</h2>
-          <p><strong>Especie:</strong> {pacienteSeleccionado.species}</p>
-          <p><strong>Raza:</strong> {pacienteSeleccionado.breed || 'No especificada'}</p>
+          {modoEdicion ? (
+            <form onSubmit={guardarEdicion} style={{ padding: '15px', border: '2px dashed #ff9800', backgroundColor: '#fffdf7' }}>
+              <h3>Editando Datos</h3>
+              
+              <p><strong>Dueño:</strong></p>
+              <input type="text" required value={nombreDueno} onChange={(e) => setNombreDueno(e.target.value)} placeholder="Nombre Dueño" style={{ marginRight: '10px', padding: '5px' }} />
+              <input type="text" value={telefonoDueno} onChange={(e) => setTelefonoDueno(e.target.value)} placeholder="Teléfono" style={{ padding: '5px' }} />
 
+              <p><strong>Paciente:</strong></p>
+              <input type="text" required value={nombreMascota} onChange={(e) => setNombreMascota(e.target.value)} placeholder="Nombre Mascota" style={{ marginRight: '10px', padding: '5px' }} />
+              <input type="text" required value={especie} onChange={(e) => setEspecie(e.target.value)} placeholder="Especie" style={{ marginRight: '10px', padding: '5px' }} />
+              <input type="text" value={raza} onChange={(e) => setRaza(e.target.value)} placeholder="Raza" style={{ padding: '5px' }} />
+              
+              <br /><br />
+              <button type="submit" style={{ backgroundColor: '#4CAF50', color: 'white', padding: '10px', border: 'none', marginRight: '10px' }}>💾 Guardar Cambios</button>
+              <button type="button" onClick={() => setModoEdicion(false)} style={{ padding: '10px' }}>Cancelar</button>
+            </form>
+          ) : (
+            <div>
+              <h2>Ficha Médica de: {pacienteSeleccionado.name}</h2>
+              <p><strong>Especie:</strong> {pacienteSeleccionado.species} | <strong>Raza:</strong> {pacienteSeleccionado.breed || 'No especificada'}</p>
+              <p><strong>Dueño responsable:</strong> {pacienteSeleccionado.owners.name} (Tel: {pacienteSeleccionado.owners.phone || 'Sin registro'})</p>
+              
+              <button onClick={activarEdicion} style={{ backgroundColor: '#ff9800', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '4px' }}>
+                ✏️ Editar Datos
+              </button>
+            </div>
+          )}
+          
           <hr />
           <button onClick={() => setMostrarFormVisita(!mostrarFormVisita)}>
             {mostrarFormVisita ? 'Cancelar' : '+Registrar Nueva Visita'}
@@ -255,7 +323,6 @@ export function SearchPage() {
 
       <hr style={{ marginTop: '40px', marginBottom: '20px' }} />
 
-      {/* --- SECCIÓN ORIGINAL DE BÚSQUEDA --- */}
       <h2>Buscador Rápido</h2>
       <input
         type="text"
