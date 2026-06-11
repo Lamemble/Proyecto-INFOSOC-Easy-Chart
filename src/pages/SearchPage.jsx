@@ -17,6 +17,8 @@ export function SearchPage() {
   const [observacionesVisita, setObservacionesVisita] = useState('');
   const [modoEdicion, setModoEdicion] = useState(false);
 
+  const [mostrarArchivar, setMostrarArchivar] = useState(false);
+  const [motivoArchivo, setMotivoArchivo] = useState('inactive_patient');
   const [nombreDueno, setNombreDueno] = useState('');
   const [telefonoDueno, setTelefonoDueno] = useState('');
 
@@ -168,6 +170,30 @@ export function SearchPage() {
       });
     }
   };
+  const manejarArchivado = async () => {
+    const confirmar = window.confirm(`¿Estás seguro de que deseas dar de baja a ${pacienteSeleccionado.name}? Esta acción lo ocultará de las búsquedas.`);
+    
+    if (!confirmar) return;
+
+    const { error } = await supabase
+      .from('pets')
+      .update({ 
+        archived_at: new Date().toISOString(), 
+        archive_reason: motivoArchivo 
+      })
+      .eq('id', pacienteSeleccionado.id);
+
+    if (error) {
+      alert("Error al archivar paciente: " + error.message);
+    } else {
+      alert("Paciente archivado exitosamente.");
+      setMostrarArchivar(false);
+      setPacienteSeleccionado(null);
+      setSearch("");
+      setResults([]);
+    }
+  };
+
   return (
     <div>
       <h1>Sistema Veterinaria</h1>
@@ -202,6 +228,34 @@ export function SearchPage() {
               <button onClick={activarEdicion} style={{ backgroundColor: '#ff9800', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '4px' }}>
                 ✏️ Editar Datos
               </button>
+
+              <button onClick={() => setMostrarArchivar(!mostrarArchivar)} style={{ backgroundColor: '#f44336', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '4px' }}>
+                🗑️ Archivar Paciente
+              </button>
+
+              {mostrarArchivar && (
+                <div style={{ marginTop: '15px', padding: '15px', border: '2px solid red', backgroundColor: '#ffebee' }}>
+                  <p style={{ color: 'red', fontWeight: 'bold' }}>⚠️ Atención: Estás a punto de dar de baja a este paciente.</p>
+                  <label>Motivo: </label>
+                  <select 
+                    value={motivoArchivo} 
+                    onChange={(e) => setMotivoArchivo(e.target.value)}
+                    style={{ padding: '5px', marginLeft: '10px', marginBottom: '10px' }}
+                  >
+                    <option value="inactive_patient">Paciente Inactivo / Fallecido</option>
+                    <option value="duplicate_record">Registro Duplicado</option>
+                    <option value="data_entry_error">Error de Ingreso</option>
+                    <option value="other">Otro</option>
+                  </select>
+                  <br />
+                  <button onClick={manejarArchivado} style={{ backgroundColor: 'red', color: 'white', padding: '8px 15px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>
+                    Confirmar Archivado
+                  </button>
+                  <button onClick={() => setMostrarArchivar(false)} style={{ marginLeft: '10px', padding: '8px 15px', cursor: 'pointer' }}>
+                    Cancelar
+                  </button>
+                </div>
+              )}
             </div>
           )}
           
