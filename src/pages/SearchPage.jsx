@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from '../utils/supabase';
 import { buscarDuenniosyMascotas } from "../services/search";
 
@@ -57,33 +57,7 @@ export function SearchPage() {
     }
     const nuevoDueñoId = ownerData[0].id;
 
-    const manejarGuardadoVisita = async (e) => {
-    e.preventDefault();
-
     const { error } = await supabase
-      .from('visits')
-      .insert([
-        { 
-          pet_id: pacienteSeleccionado.id, // Vinculamos la visita a la mascota
-          visit_date: new Date().toISOString().split('T')[0], // Guarda la fecha de hoy (YYYY-MM-DD)
-          reason: motivoVisita, // Puede ser "Consulta", "Peluquería", "Vacuna"
-          observations: observacionesVisita 
-        }
-      ]);
-
-    if (error) {
-      alert("Error al guardar la visita: " + error.message);
-    } else {
-      alert("¡Visita registrada con éxito!");
-      setMotivoVisita('');
-      setObservacionesVisita('');
-      setMostrarFormVisita(false);
-      
-      cargarHistorial(pacienteSeleccionado.id);
-    }
-  };
-
-    const { data, error } = await supabase
       .from("pets")
       .insert([{
         name: nombreMascota,
@@ -105,7 +79,9 @@ export function SearchPage() {
       setMostrarForm(false);
     }
 
-    const cargarHistorial = async (idMascota) => {
+  };
+
+  const cargarHistorial = useCallback(async (idMascota) => {
     const { data, error } = await supabase
       .from('visits')
       .select('*')
@@ -117,15 +93,42 @@ export function SearchPage() {
     } else {
       setHistorialVisitas(data);
     }
-    useEffect(() => {
-      if (pacienteSeleccionado) {
-        cargarHistorial(pacienteSeleccionado.id);
-      } else {
-        setHistorialVisitas([]);
-      }
-    }, [pacienteSeleccionado]);
+  }, []);
+
+  useEffect(() => {
+    if (pacienteSeleccionado) {
+      cargarHistorial(pacienteSeleccionado.id);
+    } else {
+      setHistorialVisitas([]);
+    }
+  }, [pacienteSeleccionado, cargarHistorial]);
+
+  const manejarGuardadoVisita = async (e) => {
+    e.preventDefault();
+
+    const { error } = await supabase
+      .from('visits')
+      .insert([
+        {
+          pet_id: pacienteSeleccionado.id, // Vinculamos la visita a la mascota
+          visit_date: new Date().toISOString().split('T')[0], // Guarda la fecha de hoy (YYYY-MM-DD)
+          reason: motivoVisita, // Puede ser "Consulta", "Peluquería", "Vacuna"
+          observations: observacionesVisita
+        }
+      ]);
+
+    if (error) {
+      alert("Error al guardar la visita: " + error.message);
+    } else {
+      alert("¡Visita registrada con éxito!");
+      setMotivoVisita('');
+      setObservacionesVisita('');
+      setMostrarFormVisita(false);
+
+      cargarHistorial(pacienteSeleccionado.id);
+    }
   };
-  }
+
   const activarEdicion = () => {
     setNombreMascota(pacienteSeleccionado.name);
     setEspecie(pacienteSeleccionado.species);
