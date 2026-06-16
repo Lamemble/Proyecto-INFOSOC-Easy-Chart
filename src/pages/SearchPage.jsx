@@ -124,6 +124,7 @@ export function SearchPage() {
   const petParam = searchParams.get('pet');
   const visitParam = searchParams.get('visit');
   const newVisitParam = searchParams.get('newVisit');
+  const newPetParam = searchParams.get('newPet');
 
   const [busquedaFichas, setBusquedaFichas] = useState("");
   const [fichas, setFichas] = useState([]);
@@ -371,7 +372,27 @@ export function SearchPage() {
   }, [cargarHistorial, fichaSeleccionada?.id, fichas, petParam, tabActiva]);
 
   useEffect(() => {
-    if (tabActiva !== 'fichas' || petParam || !fichaSeleccionada) {
+    if (tabActiva !== 'fichas' || newPetParam !== '1') {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setFichaSeleccionada(null);
+      setAtencionSeleccionada(null);
+      setHistorialVisitas([]);
+      setMostrarForm(true);
+      setMostrarFormVisita(false);
+      setPacienteNuevaAtencionId('');
+      setModoEdicion(false);
+      setModoEdicionAtencion(false);
+      setMostrarArchivar(false);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [newPetParam, tabActiva]);
+
+  useEffect(() => {
+    if (tabActiva !== 'fichas' || petParam || newPetParam || !fichaSeleccionada) {
       return undefined;
     }
 
@@ -387,7 +408,7 @@ export function SearchPage() {
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [fichaSeleccionada, petParam, tabActiva]);
+  }, [fichaSeleccionada, newPetParam, petParam, tabActiva]);
 
   useEffect(() => {
     if (tabActiva !== 'atenciones' || !visitParam || atenciones.length === 0 || atencionSeleccionada?.id === visitParam) {
@@ -512,6 +533,7 @@ export function SearchPage() {
       next.set('pet', ficha.id);
       next.delete('visit');
       next.delete('newVisit');
+      next.delete('newPet');
       return next;
     });
     setFichaSeleccionada(ficha);
@@ -527,6 +549,7 @@ export function SearchPage() {
       next.set('visit', atencion.id);
       next.delete('pet');
       next.delete('newVisit');
+      next.delete('newPet');
       return next;
     });
     setAtencionSeleccionada(atencion);
@@ -539,6 +562,19 @@ export function SearchPage() {
     if (!pacienteDesdeAtencion) return;
 
     await seleccionarFicha(pacienteDesdeAtencion);
+  };
+
+  const alternarNuevaAtencionEnFicha = () => {
+    const mostrarNuevaAtencion = !mostrarFormVisita;
+
+    if (mostrarNuevaAtencion) {
+      limpiarFormularioAtencion();
+      setPacienteNuevaAtencionId(fichaSeleccionada?.id || '');
+    }
+
+    setMostrarFormVisita(mostrarNuevaAtencion);
+    setModoEdicion(false);
+    setModoEdicionAtencion(false);
   };
 
   const manejarGuardado = async (e) => {
@@ -914,6 +950,47 @@ export function SearchPage() {
     cursor: 'pointer'
   };
 
+  const recordHeaderStyle = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: '16px',
+    marginBottom: '18px'
+  };
+
+  const recordTitleStyle = {
+    margin: '0 0 18px',
+    fontSize: '20px'
+  };
+
+  const recordNameStyle = {
+    margin: 0,
+    fontSize: '26px'
+  };
+
+  const recordActionsStyle = {
+    display: 'flex',
+    gap: '8px',
+    alignItems: 'center',
+    paddingTop: '2px'
+  };
+
+  const compactActionButtonStyle = {
+    padding: '8px 12px',
+    border: '1px solid #c8d1dc',
+    borderRadius: '6px',
+    backgroundColor: '#fff',
+    color: '#1f2933',
+    cursor: 'pointer',
+    fontSize: '14px'
+  };
+
+  const compactDangerButtonStyle = {
+    ...compactActionButtonStyle,
+    borderColor: '#ffcdd2',
+    color: '#d32f2f'
+  };
+
   const listCardButtonStyle = (selected) => ({
     width: '100%',
     display: 'block',
@@ -926,6 +1003,12 @@ export function SearchPage() {
     cursor: 'pointer',
     boxShadow: selected ? '0 2px 8px rgba(0, 140, 186, 0.12)' : 'none'
   });
+
+  const createVisitRowStyle = {
+    ...listCardButtonStyle(false),
+    color: '#0077a3',
+    fontWeight: 'bold'
+  };
 
   const cardStyle = {
     border: '1px solid #e0e0e0',
@@ -1225,7 +1308,6 @@ export function SearchPage() {
 
     return (
       <div>
-        <h2>{pacienteSeleccionado.name}</h2>
         <div style={infoGridStyle}>
           {renderInfoItem('Especie', pacienteSeleccionado.species)}
           {renderInfoItem('Raza', pacienteSeleccionado.breed)}
@@ -1236,51 +1318,60 @@ export function SearchPage() {
           {renderInfoItem('Email', pacienteSeleccionado.owners.email)}
           {renderInfoItem('Dirección', pacienteSeleccionado.owners.address)}
         </div>
-
-        <button type="button" onClick={activarEdicion} style={primaryButtonStyle}>
-          Editar datos
-        </button>
-        <button
-          type="button"
-          onClick={() => setMostrarFormVisita(!mostrarFormVisita)}
-          style={{ ...secondaryButtonStyle, marginLeft: '8px' }}
-        >
-          {mostrarFormVisita ? 'Cancelar atención' : '+ Atención'}
-        </button>
-
-        {mostrarFormVisita && renderFormularioAtencion()}
-
-        <button
-          type="button"
-          onClick={() => setMostrarArchivar(!mostrarArchivar)}
-          style={{ ...secondaryButtonStyle, marginTop: '16px', borderColor: '#d32f2f', color: '#d32f2f' }}
-        >
-          Archivar paciente
-        </button>
-
-        {mostrarArchivar && (
-          <div style={{ marginTop: '16px', padding: '14px', border: '1px solid #d32f2f', backgroundColor: '#ffebee' }}>
-            <p style={{ color: '#d32f2f', fontWeight: 'bold', marginTop: 0 }}>
-              Estás a punto de dar de baja a este paciente.
-            </p>
-            <label>
-              Motivo
-              <select value={motivoArchivo} onChange={(e) => setMotivoArchivo(e.target.value)} style={fieldStyle}>
-                <option value="inactive_patient">Paciente inactivo / fallecido</option>
-                <option value="duplicate_record">Registro duplicado</option>
-                <option value="data_entry_error">Error de ingreso</option>
-                <option value="other">Otro</option>
-              </select>
-            </label>
-            <button type="button" onClick={manejarArchivado} style={{ ...primaryButtonStyle, backgroundColor: '#d32f2f' }}>
-              Confirmar archivado
-            </button>
-            <button type="button" onClick={() => setMostrarArchivar(false)} style={{ ...secondaryButtonStyle, marginLeft: '8px' }}>
-              Cancelar
-            </button>
-          </div>
-        )}
       </div>
+    );
+  };
+
+  const renderConfirmacionArchivado = () => (
+    <div style={{ marginBottom: '16px', padding: '14px', border: '1px solid #d32f2f', backgroundColor: '#ffebee' }}>
+      <p style={{ color: '#d32f2f', fontWeight: 'bold', marginTop: 0 }}>
+        Estás a punto de dar de baja a este paciente.
+      </p>
+      <label>
+        Motivo
+        <select value={motivoArchivo} onChange={(e) => setMotivoArchivo(e.target.value)} style={fieldStyle}>
+          <option value="inactive_patient">Paciente inactivo / fallecido</option>
+          <option value="duplicate_record">Registro duplicado</option>
+          <option value="data_entry_error">Error de ingreso</option>
+          <option value="other">Otro</option>
+        </select>
+      </label>
+      <button type="button" onClick={manejarArchivado} style={{ ...primaryButtonStyle, backgroundColor: '#d32f2f' }}>
+        Confirmar archivado
+      </button>
+      <button type="button" onClick={() => setMostrarArchivar(false)} style={{ ...secondaryButtonStyle, marginLeft: '8px' }}>
+        Cancelar
+      </button>
+    </div>
+  );
+
+  const renderCabeceraFicha = () => {
+    if (!fichaSeleccionada) return null;
+
+    return (
+      <>
+        <div style={recordHeaderStyle}>
+          <div>
+            <h3 style={recordTitleStyle}>Ficha médica</h3>
+            <h2 style={recordNameStyle}>{fichaSeleccionada.name}</h2>
+          </div>
+          {!modoEdicion && (
+            <div style={recordActionsStyle} aria-label="Acciones de ficha">
+              <button type="button" onClick={activarEdicion} style={compactActionButtonStyle}>
+                Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => setMostrarArchivar(!mostrarArchivar)}
+                style={compactDangerButtonStyle}
+              >
+                Archivar
+              </button>
+            </div>
+          )}
+        </div>
+        {mostrarArchivar && renderConfirmacionArchivado()}
+      </>
     );
   };
 
@@ -1350,6 +1441,19 @@ export function SearchPage() {
           type="button"
           onClick={() => {
             const mostrarNuevaFicha = !mostrarForm;
+            setSearchParams((current) => {
+              const next = new URLSearchParams(current);
+              next.set('tab', 'fichas');
+              if (mostrarNuevaFicha) {
+                next.set('newPet', '1');
+              } else {
+                next.delete('newPet');
+              }
+              next.delete('pet');
+              next.delete('visit');
+              next.delete('newVisit');
+              return next;
+            });
             setFichaSeleccionada(null);
             setAtencionSeleccionada(null);
             setHistorialVisitas([]);
@@ -1404,7 +1508,7 @@ export function SearchPage() {
           renderFormularioFicha()
         ) : fichaSeleccionada ? (
           <>
-            <h3>Ficha médica</h3>
+            {renderCabeceraFicha()}
             {renderDatosPaciente()}
           </>
         ) : (
@@ -1419,6 +1523,10 @@ export function SearchPage() {
         <h3>Historial de atenciones</h3>
         {fichaSeleccionada ? (
           <>
+            <button type="button" onClick={alternarNuevaAtencionEnFicha} style={createVisitRowStyle}>
+              <span>{mostrarFormVisita ? 'Cancelar nueva atención' : '+ Nueva atención'}</span>
+            </button>
+            {mostrarFormVisita && renderFormularioAtencion()}
             {historialVisitas.length === 0 ? (
               <p style={emptyValueStyle}>Este paciente no tiene atenciones previas.</p>
             ) : (
@@ -1463,6 +1571,7 @@ export function SearchPage() {
               next.set('newVisit', '1');
               next.delete('visit');
               next.delete('pet');
+              next.delete('newPet');
               return next;
             });
           }}

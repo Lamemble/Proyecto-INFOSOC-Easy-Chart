@@ -19,6 +19,7 @@ export function AppShell() {
       next.delete("visit");
       next.delete("pet");
       next.delete("newVisit");
+      next.delete("newPet");
       return next;
     });
   }
